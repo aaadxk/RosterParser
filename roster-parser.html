@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roster → Calendar - Robina Hospital</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-2: #232736;
+            --border: #2e3345;
+            --text: #e8eaf0;
+            --text-dim: #8b90a5;
+            --accent: #4f8cff;
+            --accent-glow: rgba(79, 140, 255, 0.15);
+            --success: #34d399;
+            --success-glow: rgba(52, 211, 153, 0.15);
+            --warn: #fbbf24;
+            --warn-glow: rgba(251, 191, 36, 0.12);
+            --danger: #f87171;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+
+        .container { max-width: 820px; margin: 0 auto; }
+
+        header { text-align: center; margin-bottom: 2rem; }
+        header h1 {
+            font-size: 1.6rem; font-weight: 700;
+            letter-spacing: -0.02em; margin-bottom: 0.2rem;
+        }
+        header p { color: var(--text-dim); font-size: 0.88rem; }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.4rem;
+            margin-bottom: 1.1rem;
+        }
+
+        .card-title {
+            font-size: 0.78rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--text-dim); margin-bottom: 0.85rem;
+        }
+
+        .name-input {
+            width: 100%;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.65rem 1rem;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .name-input:focus { border-color: var(--accent); }
+        .name-input::placeholder { color: var(--text-dim); }
+
+        .help-text {
+            font-size: 0.78rem; color: var(--text-dim);
+            margin-top: 0.6rem; line-height: 1.45;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s;
+            position: relative;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+        .upload-zone.has-file {
+            border-color: var(--success);
+            background: var(--success-glow);
+            border-style: solid;
+        }
+        .upload-zone input[type="file"] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer;
+        }
+        .upload-icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
+        .upload-text { font-size: 0.9rem; color: var(--text-dim); }
+        .upload-text strong { color: var(--accent); }
+        .file-list { margin-top: 0.5rem; }
+        .file-item {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.4rem 0.75rem; margin-top: 0.35rem;
+            background: var(--surface-2); border-radius: 6px;
+            font-family: 'DM Mono', monospace; font-size: 0.8rem;
+        }
+        .file-item .remove {
+            margin-left: auto; cursor: pointer; color: var(--danger);
+            font-size: 0.9rem; padding: 0 0.25rem;
+        }
+        .file-item .remove:hover { opacity: 0.7; }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 0.5rem; padding: 0.7rem 1.5rem; border-radius: 8px;
+            font-family: 'DM Sans', sans-serif; font-size: 0.95rem;
+            font-weight: 600; border: none; cursor: pointer;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: #3d7aee; transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-success { background: var(--success); color: #0f1117; }
+        .btn-success:hover { background: #2bc48a; transform: translateY(-1px); }
+
+        .status-area { margin-top: 0.85rem; }
+        .status-msg {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.6rem 0.85rem; border-radius: 8px;
+            font-size: 0.85rem; margin-bottom: 0.4rem;
+        }
+        .status-msg.info { background: var(--accent-glow); color: var(--accent); border: 1px solid rgba(79,140,255,0.3); }
+        .status-msg.success { background: var(--success-glow); color: var(--success); border: 1px solid rgba(52,211,153,0.3); }
+        .status-msg.warn { background: var(--warn-glow); color: var(--warn); border: 1px solid rgba(251,191,36,0.3); }
+        .status-msg.error { background: rgba(248,113,113,0.1); color: var(--danger); border: 1px solid rgba(248,113,113,0.3); }
+
+        .period-display {
+            font-family: 'DM Mono', monospace; font-size: 0.85rem;
+            color: var(--accent); text-align: center;
+            padding: 0.5rem; background: var(--accent-glow);
+            border-radius: 6px; margin-bottom: 0.85rem;
+        }
+
+        .summary-bar {
+            display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.85rem;
+        }
+        .summary-item {
+            background: var(--surface-2); padding: 0.4rem 0.7rem;
+            border-radius: 6px; font-size: 0.8rem;
+        }
+        .summary-item strong { color: var(--accent); }
+
+        .shifts-table {
+            width: 100%; border-collapse: collapse; font-size: 0.83rem;
+        }
+        .shifts-table th {
+            text-align: left; padding: 0.45rem 0.65rem;
+            color: var(--text-dim); font-weight: 600;
+            font-size: 0.72rem; text-transform: uppercase;
+            letter-spacing: 0.05em; border-bottom: 1px solid var(--border);
+        }
+        .shifts-table td {
+            padding: 0.45rem 0.65rem; border-bottom: 1px solid var(--border);
+            font-family: 'DM Mono', monospace; font-size: 0.8rem;
+        }
+        .shifts-table tr:last-child td { border-bottom: none; }
+
+        .shift-badge {
+            display: inline-block; padding: 0.12rem 0.45rem;
+            border-radius: 4px; font-size: 0.76rem; font-weight: 600;
+            background: var(--surface-2); border: 1px solid var(--border);
+        }
+        .shift-badge.tl { border-color: var(--warn); color: var(--warn); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Roster → Calendar</h1>
+        <p>Upload your OTS roster Excel file, get an ICS for Google Calendar</p>
+    </header>
+
+    <div class="card">
+        <div class="card-title">① Your Name</div>
+        <input class="name-input" type="text" id="staffName" placeholder="e.g. Krenske, Adam" value="Krenske, Adam">
+        <div class="help-text">As it appears on the roster — matches loosely (case-insensitive, partial match)</div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">② Upload Roster Excel File(s)</div>
+        <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
+            <div class="upload-icon">📊</div>
+            <div class="upload-text"><strong>Click to upload</strong> or drag & drop</div>
+            <div class="upload-text" style="font-size:0.78rem; margin-top:0.2rem;">.xlsx files — upload multiple rosters at once</div>
+        </div>
+        <div class="file-list" id="fileList"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">③ Extract & Download</div>
+        <button class="btn btn-primary" id="parseBtn" disabled>Parse Roster</button>
+        <div class="status-area" id="statusArea"></div>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none;">
+        <div class="card-title">Your Shifts</div>
+        <div id="periodDisplay" class="period-display"></div>
+        <div id="summaryBar" class="summary-bar"></div>
+        <div id="shiftsPreview"></div>
+        <div style="margin-top:1rem;">
+            <button class="btn btn-success" id="downloadBtn">⬇ Download ICS File</button>
+        </div>
+        <div class="help-text" style="margin-top:0.6rem;">
+            Import: Google Calendar → Settings → Import & Export → select <strong>Adams Shifts</strong>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Shift definitions ──
+const SHIFT_TIMES = {
+    'EC':      { start: '06:00', end: '14:30' },
+    'E':       { start: '07:00', end: '15:30' },
+    'LA-ESC':  { start: '12:00', end: '20:30' },
+    'LA':      { start: '12:00', end: '20:30' },
+    'LE':      { start: '13:00', end: '21:30' },
+    'EJ':      { start: '09:30', end: '18:00' },
+    'EJ FLOW': { start: '09:30', end: '18:00' },
+    'EG-PTS':  { start: '08:30', end: '17:00' },
+    'EGPTS':   { start: '08:30', end: '17:00' },
+    'EM-ESC':  { start: '11:00', end: '19:30' },
+    'EMESC':   { start: '11:00', end: '19:30' },
+    'EC-ESC':  { start: '06:00', end: '14:30' },
+    'ECESC':   { start: '06:00', end: '14:30' },
+    'EF':      { start: '08:00', end: '16:30' },
+    'EF-AQOO': { start: '07:00', end: '15:30' },
+    'SHUTTLE': { start: '08:30', end: '17:00' },
+    'WEEKEND': { start: '07:30', end: '16:00' },
+    'EE':      { start: '07:30', end: '16:00' },
+};
+
+const SKIP_CODES = new Set(['00:00-00:00', 'REC', 'REC_AP', '[REC_AP]', 'MAT', '(MAT)', 'MATL', '']);
+const SKIP_ACTIVITIES = new Set(['SHFTCANCEL', 'SICK', 'REC', 'MATL', 'MAT']);
+
+const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+
+// ── State ──
+let uploadedFiles = [];
+let parsedShifts = [];
+
+// ── DOM ──
+const fileInput = document.getElementById('fileInput');
+const uploadZone = document.getElementById('uploadZone');
+const fileListEl = document.getElementById('fileList');
+const parseBtn = document.getElementById('parseBtn');
+const statusArea = document.getElementById('statusArea');
+const resultsCard = document.getElementById('resultsCard');
+const staffNameInput = document.getElementById('staffName');
+
+// ── File handling ──
+fileInput.addEventListener('change', (e) => addFiles(Array.from(e.target.files)));
+
+uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault(); uploadZone.classList.remove('dragover');
+    addFiles(Array.from(e.dataTransfer.files));
+});
+
+function addFiles(files) {
+    for (const f of files) {
+        if (!uploadedFiles.some(u => u.name === f.name && u.size === f.size)) {
+            uploadedFiles.push(f);
+        }
+    }
+    renderFileList();
+    updateParseBtn();
+}
+
+window.removeFile = function(idx) {
+    uploadedFiles.splice(idx, 1);
+    renderFileList();
+    updateParseBtn();
+};
+
+function renderFileList() {
+    if (uploadedFiles.length === 0) {
+        fileListEl.innerHTML = '';
+        uploadZone.classList.remove('has-file');
+        return;
+    }
+    uploadZone.classList.add('has-file');
+    fileListEl.innerHTML = uploadedFiles.map((f, i) =>
+        `<div class="file-item">
+            <span>📄</span> ${f.name}
+            <span class="remove" onclick="removeFile(${i})">✕</span>
+        </div>`
+    ).join('');
+}
+
+staffNameInput.addEventListener('input', updateParseBtn);
+function updateParseBtn() {
+    parseBtn.disabled = !(uploadedFiles.length > 0 && staffNameInput.value.trim());
+}
+
+function addStatus(msg, type = 'info') {
+    const div = document.createElement('div');
+    div.className = `status-msg ${type}`;
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warn' ? '⚠' : '•';
+    div.textContent = `${icon} ${msg}`;
+    statusArea.appendChild(div);
+}
+
+// ── Excel parsing ──
+function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function parseDateHeader(headerStr, year) {
+    const parts = String(headerStr).trim().split(/\s+/);
+    if (parts.length < 3) return null;
+    const day = parseInt(parts[1], 10);
+    const month = MONTHS[parts[2]];
+    if (!month || isNaN(day)) return null;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function extractYearFromSheet(ws) {
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let r = 0; r <= Math.min(range.e.r, 15); r++) {
+        for (let c = 0; c <= Math.min(range.e.c, 40); c++) {
+            const cell = ws[XLSX.utils.encode_cell({r, c})];
+            if (cell && cell.v) {
+                const match = String(cell.v).match(/(20[2-4]\d)/);
+                if (match) return parseInt(match[1]);
+            }
+        }
+    }
+    return new Date().getFullYear();
+}
+
+function extractPeriodDates(ws) {
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let r = 0; r < 15; r++) {
+        for (let c = 0; c <= Math.min(range.e.c, 40); c++) {
+            const cell = ws[XLSX.utils.encode_cell({r, c})];
+            if (cell && cell.v) {
+                const match = String(cell.v).match(/(\d{1,2})\/([A-Z]{3})\/(\d{4})\s*[-–]\s*(\d{1,2})\/([A-Z]{3})\/(\d{4})/i);
+                if (match) {
+                    const sm = MONTHS[match[2].charAt(0).toUpperCase() + match[2].slice(1).toLowerCase()];
+                    const em = MONTHS[match[5].charAt(0).toUpperCase() + match[5].slice(1).toLowerCase()];
+                    if (sm && em) {
+                        return {
+                            start: `${match[3]}-${String(sm).padStart(2,'0')}-${String(parseInt(match[1])).padStart(2,'0')}`,
+                            end: `${match[6]}-${String(em).padStart(2,'0')}-${String(parseInt(match[4])).padStart(2,'0')}`
+                        };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function findHeaderRow(ws) {
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let r = 0; r <= Math.min(range.e.r, 20); r++) {
+        for (let c = 0; c <= 10; c++) {
+            const cell = ws[XLSX.utils.encode_cell({r, c})];
+            if (cell && String(cell.v).toLowerCase().includes('employee')) return r;
+        }
+    }
+    return 11;
+}
+
+function getCell(ws, r, c) {
+    const cell = ws[XLSX.utils.encode_cell({r, c})];
+    return cell ? String(cell.v).trim() : '';
+}
+
+function parseOneFile(arrayBuffer, staffNameSearch) {
+    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+
+    const year = extractYearFromSheet(ws);
+    const period = extractPeriodDates(ws);
+    const headerRow = findHeaderRow(ws);
+
+    // Build date map from header row
+    const dateMap = {};
+    for (let c = 0; c <= range.e.c; c++) {
+        const val = getCell(ws, headerRow, c);
+        if (val) {
+            const dateStr = parseDateHeader(val, year);
+            if (dateStr) dateMap[c] = dateStr;
+        }
+    }
+
+    if (Object.keys(dateMap).length === 0) {
+        return { shifts: [], period, skipped: [], staffRows: 0, error: 'Could not find date headers' };
+    }
+
+    // Find staff rows (loose match)
+    const searchTerms = staffNameSearch.toLowerCase().split(/[\s,]+/).filter(t => t.length > 1);
+    const staffRows = [];
+
+    for (let r = headerRow + 1; r <= range.e.r; r++) {
+        for (let c = 0; c <= 8; c++) {
+            const val = getCell(ws, r, c).toLowerCase();
+            if (val && searchTerms.every(term => val.includes(term))) {
+                staffRows.push(r);
+                break;
+            }
+        }
+    }
+
+    const shifts = [];
+    const skipped = [];
+
+    for (const nameRow of staffRows) {
+        for (const [colStr, dateStr] of Object.entries(dateMap)) {
+            const col = parseInt(colStr);
+            const shiftCode = getCell(ws, nameRow, col);
+            const timeVal = getCell(ws, nameRow + 1, col);
+            const activity = getCell(ws, nameRow + 2, col);
+
+            if (!shiftCode || SKIP_CODES.has(shiftCode)) continue;
+            if (shiftCode === '00:00-00:00') continue;
+
+            if (activity && SKIP_ACTIVITIES.has(activity.toUpperCase())) {
+                skipped.push({ date: dateStr, code: shiftCode, reason: activity });
+                continue;
+            }
+
+            const isTL = shiftCode.includes('-TL') || shiftCode.endsWith(' TL');
+            const baseCode = shiftCode.replace(/-TL$/, '').replace(/ TL$/, '').toUpperCase();
+
+            let startTime, endTime;
+            if (timeVal && timeVal.includes(':') && timeVal.includes('-')) {
+                const parts = timeVal.split('-');
+                startTime = parts[0].trim();
+                endTime = parts[1].trim();
+            } else {
+                const lookup = SHIFT_TIMES[baseCode] || SHIFT_TIMES[shiftCode.toUpperCase()];
+                if (lookup) {
+                    startTime = lookup.start;
+                    endTime = lookup.end;
+                } else {
+                    skipped.push({ date: dateStr, code: shiftCode, reason: 'Unknown shift code' });
+                    continue;
+                }
+            }
+
+            shifts.push({ date: dateStr, code: shiftCode, start: startTime, end: endTime, is_tl: isTL });
+        }
+    }
+
+    return { shifts, period, skipped, staffRows: staffRows.length };
+}
+
+// ── Parse button ──
+parseBtn.addEventListener('click', async () => {
+    const staffName = staffNameInput.value.trim();
+    if (!staffName || uploadedFiles.length === 0) return;
+
+    statusArea.innerHTML = '';
+    resultsCard.style.display = 'none';
+    parseBtn.disabled = true;
+    parseBtn.textContent = 'Parsing...';
+
+    try {
+        let allShifts = [];
+        let allSkipped = [];
+        let periods = [];
+
+        for (const file of uploadedFiles) {
+            const buf = await readFileAsArrayBuffer(file);
+            const result = parseOneFile(buf, staffName);
+
+            if (result.error) { addStatus(`${file.name}: ${result.error}`, 'error'); continue; }
+            if (result.staffRows === 0) { addStatus(`${file.name}: "${staffName}" not found`, 'error'); continue; }
+
+            allShifts.push(...result.shifts);
+            allSkipped.push(...result.skipped);
+            if (result.period) periods.push(result.period);
+
+            addStatus(`${file.name}: ${result.shifts.length} shifts found`, 'success');
+            if (result.skipped.length > 0) {
+                addStatus(`  Skipped ${result.skipped.length} (${[...new Set(result.skipped.map(s => s.reason))].join(', ')})`, 'warn');
+            }
+        }
+
+        // Deduplicate
+        const seen = new Set();
+        allShifts = allShifts.filter(s => {
+            const key = `${s.date}_${s.code}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+
+        allShifts.sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+
+        if (allShifts.length === 0) {
+            addStatus('No shifts found. Check the name matches the roster.', 'error');
+            return;
+        }
+
+        addStatus(`Total: ${allShifts.length} shifts ready for download`, 'info');
+        parsedShifts = allShifts;
+
+        const overallPeriod = periods.length > 0 ? {
+            start: periods.reduce((min, p) => p.start < min ? p.start : min, periods[0].start),
+            end: periods.reduce((max, p) => p.end > max ? p.end : max, periods[0].end),
+        } : null;
+
+        displayResults({ shifts: allShifts, period: overallPeriod });
+
+    } catch (err) {
+        addStatus(`Error: ${err.message}`, 'error');
+        console.error(err);
+    } finally {
+        parseBtn.disabled = false;
+        parseBtn.textContent = 'Parse Roster';
+        updateParseBtn();
+    }
+});
+
+// ── Display results ──
+function displayResults({ shifts, period }) {
+    resultsCard.style.display = 'block';
+
+    const periodDisplay = document.getElementById('periodDisplay');
+    const fmt = d => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (period) {
+        periodDisplay.textContent = `${fmt(new Date(period.start + 'T00:00:00'))} → ${fmt(new Date(period.end + 'T00:00:00'))}`;
+    } else {
+        periodDisplay.textContent = `${shifts[0].date} → ${shifts[shifts.length-1].date}`;
+    }
+
+    const shiftCounts = {};
+    let tlCount = 0;
+    shifts.forEach(s => {
+        const base = s.code.replace(/-TL$/, '').replace(/ TL$/, '');
+        shiftCounts[base] = (shiftCounts[base] || 0) + 1;
+        if (s.is_tl) tlCount++;
+    });
+
+    document.getElementById('summaryBar').innerHTML = `
+        <div class="summary-item"><strong>${shifts.length}</strong> shifts</div>
+        ${tlCount > 0 ? `<div class="summary-item"><strong>${tlCount}</strong> TL</div>` : ''}
+        ${Object.entries(shiftCounts).map(([k, v]) => `<div class="summary-item">${k}: <strong>${v}</strong></div>`).join('')}
+    `;
+
+    document.getElementById('shiftsPreview').innerHTML = `
+        <table class="shifts-table">
+            <thead><tr><th>Date</th><th>Day</th><th>Shift</th><th>Time</th></tr></thead>
+            <tbody>
+                ${shifts.map(s => {
+                    const d = new Date(s.date + 'T00:00:00');
+                    const day = d.toLocaleDateString('en-AU', { weekday: 'short' });
+                    const date = d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+                    const base = s.code.replace(/-TL$/, '').replace(/ TL$/, '');
+                    const label = s.is_tl ? `${base} TL` : base;
+                    return `<tr>
+                        <td>${date}</td><td>${day}</td>
+                        <td><span class="shift-badge ${s.is_tl ? 'tl' : ''}">${label}</span></td>
+                        <td>${s.start} – ${s.end}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── ICS download ──
+document.getElementById('downloadBtn').addEventListener('click', () => {
+    if (parsedShifts.length === 0) return;
+
+    const events = parsedShifts.map(s => {
+        const dc = s.date.replace(/-/g, '');
+        const [sh, sm] = s.start.split(':');
+        const [eh, em] = s.end.split(':');
+        const base = s.code.replace(/-TL$/, '').replace(/ TL$/, '');
+        const summary = `Work ${s.is_tl ? 'TL ' : ''}${base}`;
+        const desc = `${s.is_tl ? 'Team Leader ' : ''}${s.code} shift`;
+        const uid = `roster-${dc}-${s.code.toLowerCase().replace(/[^a-z0-9]/g,'')}-${Math.random().toString(36).slice(2,8)}@robina`;
+
+        return `BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').split('.')[0]}Z
+DTSTART;TZID=Australia/Brisbane:${dc}T${sh}${sm}00
+DTEND;TZID=Australia/Brisbane:${dc}T${eh}${em}00
+SUMMARY:${summary}
+DESCRIPTION:${desc}
+LOCATION:Robina Hospital\\, 2 Bayberry Ln\\, Robina QLD 4226\\, Australia
+END:VEVENT`;
+    });
+
+    const ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Robina Roster Parser//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VTIMEZONE
+TZID:Australia/Brisbane
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+1000
+TZOFFSETTO:+1000
+TZNAME:AEST
+END:STANDARD
+END:VTIMEZONE
+${events.join('\n')}
+END:VCALENDAR`;
+
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const name = staffNameInput.value.trim().replace(/[^a-zA-Z]/g, '') || 'roster';
+    a.download = `roster-${name}-${parsedShifts[0].date}.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
